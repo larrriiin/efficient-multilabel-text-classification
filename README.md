@@ -1,9 +1,5 @@
 # efficient-multilabel-text-classification
 
-<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
-    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
-</a>
-
 A project exploring efficient transformer-based architectures for multilabel text classification using the Jigsaw Toxic Comment Classification dataset. Includes data preprocessing, model implementation, experimental comparison, and detailed results analysis.
 
 ## Project Organization
