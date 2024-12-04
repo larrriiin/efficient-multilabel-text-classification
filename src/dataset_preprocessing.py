@@ -32,6 +32,7 @@ nltk.download('omw-1.4')
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 
+
 def preprocess_text(text: str, remove_digits=True) -> str:
     if remove_digits:
         text = re.sub(r"[^a-zA-Z\s]", "", text)
@@ -50,6 +51,7 @@ def preprocess_text(text: str, remove_digits=True) -> str:
     # Сборка обратно в строку
     text = " ".join(words)
     return text
+
 
 @app.command()
 def main(params_path: str):
@@ -75,7 +77,6 @@ def main(params_path: str):
     val_data.to_csv(processed_data_dir / "val.csv", index=False)
 
     logger.success(f"Processed train and validation datasets saved in {processed_data_dir}")
-
 
 
 if __name__ == "__main__":
