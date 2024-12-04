@@ -11,20 +11,20 @@ import yaml
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-project_root = Path("your_project_path")  # Укажите корень вашего проекта
+project_root = Path().resolve().parent
 
-# Настройка TensorBoard и модели
-log_dir = project_root / ".." / "logs"
-log_dir.mkdir(parents=True, exist_ok=True)
-writer = SummaryWriter(log_dir=str(log_dir))
-
-with open("params.yaml", "r") as f:
+with open(project_root / ".." / "params.yaml", "r") as f:
     params = yaml.safe_load(f)
 
 num_epochs = params["experiment"]["num_epochs"]
 batch_size = params["experiment"]["batch_size"]
 learning_rate = params["experiment"]["learning_rate"]
-log_dir = params["logging"]["log_dir"]
+log_dir = project_root / ".." / params["logging"]["log_dir"]
+
+log_dir.mkdir(parents=True, exist_ok=True)
+writer = SummaryWriter(log_dir=str(log_dir))
+
+print(learning_rate)
 
 # Пути к данным
 
