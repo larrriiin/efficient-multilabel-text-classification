@@ -23,6 +23,14 @@ model_dir = project_root / ".." / "models"
 train_data = pd.read_csv(train_path)
 val_data = pd.read_csv(val_path)
 
+# Убедимся, что нет NaN или других ошибок
+train_data = train_data.dropna(subset=["comment_text"])
+val_data = val_data.dropna(subset=["comment_text"])
+
+# Преобразуем в строки, если необходимо
+train_data["comment_text"] = train_data["comment_text"].astype(str)
+val_data["comment_text"] = val_data["comment_text"].astype(str)
+
 # Выбор текста и меток
 train_texts = train_data["comment_text"].tolist()
 train_labels = train_data[["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]].values
