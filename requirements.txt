@@ -7,4 +7,6 @@ pip
 python-dotenv
 tqdm
 typer
+pandas
+marshmallow_dataclass
 -e .
