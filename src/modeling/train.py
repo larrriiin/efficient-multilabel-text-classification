@@ -18,6 +18,7 @@ project_root = Path().resolve().parent
 
 train_path = project_root / ".." / "data" / "processed" / "train.csv"
 val_path = project_root / ".." / "data" / "processed" / "val.csv"
+model_dir = project_root / ".." / "models"
 
 train_data = pd.read_csv(train_path)
 val_data = pd.read_csv(val_path)
@@ -158,3 +159,14 @@ for epoch in range(num_epochs):
     val_loss, val_f1 = evaluate(model, val_dataloader, device)
     print(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
     print(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
+
+
+# Сохранение токенайзера
+tokenizer.save_pretrained(model_dir)
+
+# Сохранение модели
+model.base_model.save_pretrained(model_dir)
+
+torch.save(model.classifier.state_dict(), model_dir / "classifier_head.pth")
+
+print(f"Модель и токенайзер сохранены в: {model_dir}")
