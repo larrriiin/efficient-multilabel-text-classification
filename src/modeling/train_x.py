@@ -7,10 +7,26 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import AdamW
 from sklearn.metrics import f1_score
 import numpy as np
+import yaml
 from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
+
+project_root = Path("your_project_path")  # Укажите корень вашего проекта
+
+# Настройка TensorBoard и модели
+log_dir = project_root / ".." / "logs"
+log_dir.mkdir(parents=True, exist_ok=True)
+writer = SummaryWriter(log_dir=str(log_dir))
+
+with open("params.yaml", "r") as f:
+    params = yaml.safe_load(f)
+
+num_epochs = params["experiment"]["num_epochs"]
+batch_size = params["experiment"]["batch_size"]
+learning_rate = params["experiment"]["learning_rate"]
+log_dir = params["logging"]["log_dir"]
 
 # Пути к данным
-project_root = Path("your_project_path")  # Укажите корень вашего проекта
 
 train_path = project_root / ".." / "data" / "processed" / "train.csv"
 val_path = project_root / ".." / "data" / "processed" / "val.csv"
@@ -35,12 +51,13 @@ val_texts = val_data["comment_text"].tolist()
 val_labels = val_data[["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]].values
 
 # 1. Загрузка модели и токенайзера
-MODEL_NAME = "xlm-roberta-base"
+MODEL_NAME = params["experiment"]["tokenizer_name"]
+
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 base_model = AutoModel.from_pretrained(MODEL_NAME)
 
 # Добавление специальных токенов
-special_tokens = [f"[CLS_{i}]" for i in range(1, 7)]
+special_tokens = [f"[CLS_{i}]" for i in range(1, params["model"]["num_classes"] + 1)]
 tokenizer.add_special_tokens({"additional_special_tokens": special_tokens})
 base_model.resize_token_embeddings(len(tokenizer))
 
@@ -171,14 +188,32 @@ val_dataloader = DataLoader(val_dataset, batch_size=16, shuffle=False)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
-num_epochs = 3
+# Сохранение лучшей модели
+best_val_f1 = 0.0  # Для отслеживания лучшей метрики
 for epoch in range(num_epochs):
-    print(f"Epoch {epoch + 1}/{num_epochs}")
+    print(f"\nEpoch {epoch + 1}/{num_epochs}")
+
+    # Обучение
     train_loss, train_f1 = train_epoch(model, train_dataloader, optimizer, device)
-    val_loss, val_f1 = evaluate(model, val_dataloader, device)
+    writer.add_scalar("Loss/train", train_loss, epoch + 1)
+    writer.add_scalar("F1/train", train_f1, epoch + 1)
     print(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
+
+    # Валидация
+    val_loss, val_f1 = evaluate(model, val_dataloader, device)
+    writer.add_scalar("Loss/val", val_loss, epoch + 1)
+    writer.add_scalar("F1/val", val_f1, epoch + 1)
     print(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
 
+    # Сохранение лучшей модели
+    if val_f1 > best_val_f1:
+        best_val_f1 = val_f1
+        model_save_path = model_dir / f"best_model_epoch_{epoch + 1}.pth"
+        torch.save(model.state_dict(), model_save_path)
+        print(f"Лучшее значение F1: {best_val_f1:.4f}. Модель сохранена в {model_save_path}.")
+
+# Закрытие TensorBoard
+writer.close()
 
 # Сохранение токенайзера
 tokenizer.save_pretrained(model_dir)
