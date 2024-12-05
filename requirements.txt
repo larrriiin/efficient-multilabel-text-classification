@@ -8,5 +8,11 @@ python-dotenv
 tqdm
 typer
 pandas
-marshmallow_dataclass
+transformers
+torch
+scikit-learn
+nltk
+pyyaml
+marshmallow
+marshmallow-dataclass
 -e .
