@@ -56,6 +56,13 @@ log_dir.mkdir(parents=True, exist_ok=True)
 log_file = log_dir / "train_cls.log"
 logger.add(log_file, rotation="10 MB", retention="10 days", level="INFO")
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True  # Гарантирует детерминизм в CUDNN
+    torch.backends.cudnn.benchmark = False  # Отключает динамическую оптимизацию
 
 class CustomDataset(Dataset):
     """
@@ -202,6 +209,7 @@ def main(params_path: str) -> None:
         params_path (str): Path to the pipeline parameters file.
     """
     params = read_pipeline_params(params_path)
+    set_seed(params.experiment.seed)
     train_data = pd.read_csv(Path(params.paths.processed_data_dir) / params.data.train_file)
     val_data = pd.read_csv(Path(params.paths.processed_data_dir) / params.data.val_file)
 
@@ -221,25 +229,21 @@ def main(params_path: str) -> None:
     tokenizer = AutoTokenizer.from_pretrained(params.model.pretrained_model_name)
     base_model = AutoModel.from_pretrained(params.model.pretrained_model_name)
 
-    # 4. Инициализация модели и оптимизатора
     num_classes = train_labels.shape[1]  # Количество меток
     model = CLSClassifier(base_model, num_classes)
-    optimizer = AdamW(model.parameters(), lr=1e-5)
+    optimizer = AdamW(model.parameters(), lr=params.experiment.learning_rate)
 
-    # 7. Подготовка данных
     train_dataset = CustomDataset(train_texts, train_labels, tokenizer)
     val_dataset = CustomDataset(val_texts, val_labels, tokenizer)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=params.experiment.batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=params.experiment.batch_size, shuffle=False)
 
-    # 8. Основной цикл
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    num_epochs = 3
-    for epoch in range(num_epochs):
-        logger.info(f"Epoch {epoch + 1}/{num_epochs}")
+    for epoch in range(params.experiment.num_epochs):
+        logger.info(f"Epoch {epoch + 1}/{params.experiment.num_epochs}")
         train_loss, train_f1 = train_epoch(model, train_dataloader, optimizer, device)
         val_loss, val_f1 = evaluate(model, val_dataloader, device)
         logger.info(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")

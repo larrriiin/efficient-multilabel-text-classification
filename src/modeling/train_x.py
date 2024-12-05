@@ -1,74 +1,61 @@
-import pandas as pd
+import sys
 from pathlib import Path
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AdamW
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader, Dataset
-from transformers import AdamW
 from sklearn.metrics import f1_score
 import numpy as np
-import yaml
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
+import pandas as pd
+import typer
+from loguru import logger
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from entities.params import read_pipeline_params
+
+app = typer.Typer()
 
 project_root = Path().resolve().parent
 
-with open(project_root / ".." / "params.yaml", "r") as f:
-    params = yaml.safe_load(f)
-
-num_epochs = params["experiment"]["num_epochs"]
-batch_size = params["experiment"]["batch_size"]
-learning_rate = params["experiment"]["learning_rate"]
-log_dir = project_root / ".." / params["logging"]["log_dir"]
-
+log_dir = Path("logs")
 log_dir.mkdir(parents=True, exist_ok=True)
-writer = SummaryWriter(log_dir=str(log_dir))
 
-print(learning_rate)
-
-# Пути к данным
-
-train_path = project_root / ".." / "data" / "processed" / "train.csv"
-val_path = project_root / ".." / "data" / "processed" / "val.csv"
-model_dir = project_root / ".." / "models" / "CLS_X"
-
-# Чтение данных
-train_data = pd.read_csv(train_path)
-val_data = pd.read_csv(val_path)
-
-train_data = train_data.dropna(subset=["comment_text"])
-val_data = val_data.dropna(subset=["comment_text"])
-
-# Преобразуем в строки, если необходимо
-train_data["comment_text"] = train_data["comment_text"].astype(str)
-val_data["comment_text"] = val_data["comment_text"].astype(str)
-
-# Выбор текста и меток
-train_texts = train_data["comment_text"].tolist()
-train_labels = train_data[["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]].values
-
-val_texts = val_data["comment_text"].tolist()
-val_labels = val_data[["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]].values
-
-# 1. Загрузка модели и токенайзера
-MODEL_NAME = params["experiment"]["tokenizer_name"]
-
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-base_model = AutoModel.from_pretrained(MODEL_NAME)
-
-# Добавление специальных токенов
-special_tokens = [f"[CLS_{i}]" for i in range(1, params["model"]["num_classes"] + 1)]
-tokenizer.add_special_tokens({"additional_special_tokens": special_tokens})
-base_model.resize_token_embeddings(len(tokenizer))
+log_file = log_dir / "train_clsx.log"
+logger.add(log_file, rotation="10 MB", retention="10 days", level="INFO")
 
 
-# 2. Датасет
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True  # Гарантирует детерминизм в CUDNN
+    torch.backends.cudnn.benchmark = False  # Отключает динамическую оптимизацию
+
+
 class CustomDataset(Dataset):
+    """
+    A Dataset for tokenizing text data with labels.
+
+    Args:
+        texts (list[str]): Input texts.
+        labels (list): Labels for the texts.
+        tokenizer: Tokenizer for text processing.
+        max_length (int): Max sequence length (default: 128).
+    """
+
     def __init__(self, texts, labels, tokenizer, max_length=128):
         self.texts = texts
         self.labels = labels
         self.tokenizer = tokenizer
         self.max_length = max_length
+
+        # Получаем ID для специального токена '[CLS_X]'
+        self.cls_x_token = "[CLS_X]"
+        self.tokenizer.add_special_tokens({"additional_special_tokens": [self.cls_x_token]})
+        self.cls_x_token_id = self.tokenizer.convert_tokens_to_ids(self.cls_x_token)
 
     def __len__(self):
         return len(self.texts)
@@ -76,8 +63,10 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         text = self.texts[idx]
         label = self.labels[idx]
+        # Добавляем '[CLS_X]' в начало текста
+        text_with_cls_x = f"{self.cls_x_token} {text}"
         encoded = self.tokenizer(
-            text + " " + " ".join(special_tokens),  # Добавляем [CLS_X] токены к тексту
+            text_with_cls_x,
             max_length=self.max_length,
             padding="max_length",
             truncation=True,
@@ -90,41 +79,46 @@ class CustomDataset(Dataset):
         }
 
 
-# 3. Классификатор с [CLS_X]-токенами
-class CLSXClassifier(nn.Module):
+class CLSClassifier(nn.Module):
+    """
+    A classification model with a transformer base and a custom classifier head.
+
+    Args:
+        base_model: Pretrained transformer model.
+        num_classes (int): Number of output classes.
+    """
+
     def __init__(self, base_model, num_classes):
-        super(CLSXClassifier, self).__init__()
+        super(CLSClassifier, self).__init__()
         self.base_model = base_model
-        self.num_classes = num_classes
-        self.classifiers = nn.ModuleList([
-            nn.Sequential(
-                nn.Linear(base_model.config.hidden_size, base_model.config.hidden_size),
-                nn.Tanh(),
-                nn.Linear(base_model.config.hidden_size, 1),
-            )
-            for _ in range(num_classes)
-        ])
+        self.classifier = nn.Sequential(
+            nn.Linear(base_model.config.hidden_size, base_model.config.hidden_size),
+            nn.Tanh(),
+            nn.Linear(base_model.config.hidden_size, num_classes),
+        )
 
     def forward(self, input_ids, attention_mask):
         outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
-        cls_embeddings = outputs.last_hidden_state[:, 1:1 + self.num_classes, :]  # [CLS_1], ..., [CLS_6]
-
-        logits = torch.cat([
-            classifier(cls_embeddings[:, i, :]).unsqueeze(1) for i, classifier in enumerate(self.classifiers)
-        ], dim=1)
-
-        return logits
+        # Извлекаем выходы для токена '[CLS_X]'
+        cls_x_output = outputs.last_hidden_state[
+            :, 1, :
+        ]  # Предполагаем, что '[CLS_X]' на позиции 1
+        return self.classifier(cls_x_output)
 
 
-# 4. Инициализация модели и оптимизатора
-num_classes = train_labels.shape[1]  # Количество меток
-model = CLSXClassifier(base_model, num_classes)
-model.base_model.resize_token_embeddings(len(tokenizer))  # Увеличиваем эмбеддинги для дополнительных токенов
-optimizer = AdamW(model.parameters(), lr=1e-5)
-
-
-# 5. Тренировочный цикл
 def train_epoch(model, dataloader, optimizer, device):
+    """
+    Trains the model for one epoch.
+
+    Args:
+        model: The model to train.
+        dataloader: DataLoader for training data.
+        optimizer: Optimizer for updating model weights.
+        device: Device for computation (CPU/GPU).
+
+    Returns:
+        tuple: Average loss and F1 score for the epoch.
+    """
     model.train()
     losses = []
     all_preds = []
@@ -151,8 +145,18 @@ def train_epoch(model, dataloader, optimizer, device):
     return avg_loss, f1
 
 
-# 6. Валидация
 def evaluate(model, dataloader, device):
+    """
+    Evaluates the model on a validation dataset.
+
+    Args:
+        model: The model to evaluate.
+        dataloader: DataLoader for validation data.
+        device: Device for computation (CPU/GPU).
+
+    Returns:
+        tuple: Average loss and F1 score for the validation dataset.
+    """
     model.eval()
     all_preds = []
     all_labels = []
@@ -177,50 +181,80 @@ def evaluate(model, dataloader, device):
     return avg_loss, f1
 
 
-# 7. Подготовка данных
-train_dataset = CustomDataset(train_texts, train_labels, tokenizer)
-val_dataset = CustomDataset(val_texts, val_labels, tokenizer)
+@app.command()
+def main(params_path: str) -> None:
+    """
+    Main function to train and evaluate the text classification model.
 
-train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+    Args:
+        params_path (str): Path to the pipeline parameters file.
+    """
+    params = read_pipeline_params(params_path)
+    set_seed(params.experiment.seed)
+    train_data = pd.read_csv(Path(params.paths.processed_data_dir) / params.data.train_file)
+    val_data = pd.read_csv(Path(params.paths.processed_data_dir) / params.data.val_file)
 
-# 8. Основной цикл
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
+    train_data = train_data.dropna(subset=["comment_text"])
+    val_data = val_data.dropna(subset=["comment_text"])
 
-# Сохранение лучшей модели
-best_val_f1 = 0.0  # Для отслеживания лучшей метрики
-for epoch in range(num_epochs):
-    print(f"\nEpoch {epoch + 1}/{num_epochs}")
+    train_texts = train_data["comment_text"].tolist()
+    train_labels = train_data[
+        ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
+    ].values
 
-    # Обучение
-    train_loss, train_f1 = train_epoch(model, train_dataloader, optimizer, device)
-    writer.add_scalar("Loss/train", train_loss, epoch + 1)
-    writer.add_scalar("F1/train", train_f1, epoch + 1)
-    print(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
+    val_texts = val_data["comment_text"].tolist()
+    val_labels = val_data[
+        ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
+    ].values
 
-    # Валидация
-    val_loss, val_f1 = evaluate(model, val_dataloader, device)
-    writer.add_scalar("Loss/val", val_loss, epoch + 1)
-    writer.add_scalar("F1/val", val_f1, epoch + 1)
-    print(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
+    tokenizer = AutoTokenizer.from_pretrained(params.model.pretrained_model_name)
+    # Добавляем специальный токен '[CLS_X]'
+    tokenizer.add_special_tokens({"additional_special_tokens": ["[CLS_X]"]})
 
-    # Сохранение лучшей модели
-    if val_f1 > best_val_f1:
-        best_val_f1 = val_f1
-        model_save_path = model_dir / f"best_model_epoch_{epoch + 1}.pth"
-        torch.save(model.state_dict(), model_save_path)
-        print(f"Лучшее значение F1: {best_val_f1:.4f}. Модель сохранена в {model_save_path}.")
+    base_model = AutoModel.from_pretrained(params.model.pretrained_model_name)
+    # Обновляем эмбеддинги модели для нового токена
+    base_model.resize_token_embeddings(len(tokenizer))
 
-# Закрытие TensorBoard
-writer.close()
+    # Инициализация модели и оптимизатора
+    num_classes = train_labels.shape[1]  # Количество меток
+    model = CLSClassifier(base_model, num_classes)
+    optimizer = AdamW(model.parameters(), lr=params.experiment.learning_rate)
 
-# Сохранение токенайзера
-tokenizer.save_pretrained(model_dir)
+    # Подготовка данных
+    train_dataset = CustomDataset(train_texts, train_labels, tokenizer)
+    val_dataset = CustomDataset(val_texts, val_labels, tokenizer)
 
-# Сохранение модели
-model.base_model.save_pretrained(model_dir)
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=params.experiment.batch_size, shuffle=True
+    )
+    val_dataloader = DataLoader(
+        val_dataset, batch_size=params.experiment.batch_size, shuffle=False
+    )
 
-torch.save(model.classifier.state_dict(), model_dir / "classifier_head_x.pth")
+    # Основной цикл обучения
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
 
-print(f"Модель и токенайзер сохранены в: {model_dir}")
+    for epoch in range(params.experiment.num_epochs):
+        logger.info(f"Epoch {epoch + 1}/{params.experiment.num_epochs}")
+        train_loss, train_f1 = train_epoch(model, train_dataloader, optimizer, device)
+        val_loss, val_f1 = evaluate(model, val_dataloader, device)
+        logger.info(f"Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}")
+        logger.info(f"Val Loss: {val_loss:.4f}, Val F1: {val_f1:.4f}")
+
+    model_dir = Path(params.paths.clsx_model_dir)
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    # Сохранение токенайзера
+    tokenizer.save_pretrained(model_dir)
+
+    # Сохранение модели
+    model.base_model.save_pretrained(model_dir)
+
+    torch.save(model.classifier.state_dict(), model_dir / "classifier_head.pth")
+
+    logger.success(f"Модель и токенайзер сохранены в: {model_dir}")
+
+
+if __name__ == "__main__":
+    app()

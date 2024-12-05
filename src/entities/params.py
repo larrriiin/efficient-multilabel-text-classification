@@ -35,7 +35,6 @@ class DataParams:
 # Определяем параметры для экспериментов
 @dataclass
 class ExperimentParams:
-    model_architectures: list
     batch_size: int
     learning_rate: float
     num_epochs: int
@@ -48,16 +47,6 @@ class ExperimentParams:
 @dataclass
 class ModelParams:
     pretrained_model_name: str
-    hidden_size: int
-    num_classes: int
-
-
-# Определяем параметры для логирования
-@dataclass
-class LoggingParams:
-    experiment_tracker: str
-    log_dir: str
-    save_logs_to_repo: bool
 
 
 # Основной класс для всех параметров пайплайна
@@ -67,7 +56,6 @@ class PipelineParams:
     data: DataParams
     experiment: ExperimentParams
     model: ModelParams
-    logging: LoggingParams
 
 
 # Создаем схему для валидации и загрузки параметров
