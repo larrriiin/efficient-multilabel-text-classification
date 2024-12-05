@@ -39,7 +39,6 @@ class ExperimentParams:
     learning_rate: float
     num_epochs: int
     max_seq_length: int
-    tokenizer_name: str
     seed: int
 
 
