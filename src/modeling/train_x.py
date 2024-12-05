@@ -30,7 +30,7 @@ print(learning_rate)
 
 train_path = project_root / ".." / "data" / "processed" / "train.csv"
 val_path = project_root / ".." / "data" / "processed" / "val.csv"
-model_dir = project_root / ".." / "models"
+model_dir = project_root / ".." / "models" / "CLS_X"
 
 # Чтение данных
 train_data = pd.read_csv(train_path)

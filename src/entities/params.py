@@ -14,6 +14,8 @@ class Paths:
     processed_data_dir: str
     external_data_dir: str
     models_dir: str
+    cls_model_dir: str
+    clsx_model_dir: str
     reports_dir: str
     figures_dir: str
 
@@ -23,6 +25,7 @@ class Paths:
 class DataParams:
     train_file: str
     test_file: str
+    val_file: str
     sample_submission_file: str
     test_labels_file: str
     train_split: float

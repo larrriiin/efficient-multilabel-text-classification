@@ -73,8 +73,8 @@ def main(params_path: str):
     processed_data_dir = Path(params.paths.processed_data_dir)
     processed_data_dir.mkdir(parents=True, exist_ok=True)
 
-    train_data.to_csv(processed_data_dir / "train.csv", index=False)
-    val_data.to_csv(processed_data_dir / "val.csv", index=False)
+    train_data.to_csv(processed_data_dir / params.data.train_file, index=False)
+    val_data.to_csv(processed_data_dir / params.data.val_file, index=False)
 
     logger.success(f"Processed train and validation datasets saved in {processed_data_dir}")
 

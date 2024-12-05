@@ -6,12 +6,15 @@ paths:
   processed_data_dir: "data/processed"
   external_data_dir: "data/external"
   models_dir: "models"
+  cls_model_dir: "models/CLS"
+  clsx_model_dir: "models/CLSX"
   reports_dir: "reports"
   figures_dir: "reports/figures"
 
 data:
   train_file: "train.csv"
   test_file: "test.csv"
+  val_file: "val.csv"
   sample_submission_file: "sample_submission.csv"
   test_labels_file: "test_labels.csv"
   train_split: 0.8
