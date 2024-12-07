@@ -11,25 +11,6 @@ This script performs the following tasks:
 6. Evaluates the model on the validation dataset.
 7. Saves the trained model and tokenizer for future use.
 8. Generates a metrics table and saves it as a CSV file.
-
-Classes:
-    CustomDataset: A dataset class for tokenizing text data and handling labels.
-    SpecialCLSClassifier: A classification model that uses special CLS tokens for each class.
-
-Functions:
-    compute_metrics: Computes precision, recall, and F1 scores.
-    train_epoch: Trains the model for one epoch and computes average loss and metrics.
-    evaluate: Evaluates the model on the validation dataset and computes average loss and metrics.
-    main: Reads parameters, prepares data, trains the model, evaluates it, and saves the outputs.
-
-Logging:
-    Logs are saved in the `logs/train_special_cls.log` file, with rotation and retention policies.
-
-Usage:
-    Run the script with `typer`:
-    ```
-    python train_special_cls.py --params-path <path_to_params_file>
-    ```
 """
 
 import sys
@@ -41,8 +22,7 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import (
     f1_score,
     precision_score,
-    recall_score,
-    classification_report,
+    recall_score
 )
 import numpy as np
 from tqdm import tqdm
@@ -99,10 +79,10 @@ class CustomDataset(Dataset):
     def __getitem__(self, idx):
         text = self.texts[idx]
         label = self.labels[idx]
-        # Add special CLS tokens after the original CLS token
+        # Add special CLS tokens after the model's starting token. They will appear after <s>.
         special_cls_tokens = [f"[CLS_{i}]" for i in range(1, self.num_classes + 1)]
-        # Prepend the special tokens to the text
         text_with_special_tokens = " ".join(special_cls_tokens) + " " + text
+        
         encoded = self.tokenizer(
             text_with_special_tokens,
             max_length=self.max_length,
@@ -120,11 +100,6 @@ class CustomDataset(Dataset):
 class SpecialCLSClassifier(nn.Module):
     """
     A classification model that uses special CLS tokens for each class.
-
-    Args:
-        base_model: Pretrained transformer model.
-        num_classes (int): Number of output classes.
-        tokenizer: The tokenizer used (to get special token IDs).
     """
 
     def __init__(self, base_model, num_classes, tokenizer):
@@ -132,45 +107,21 @@ class SpecialCLSClassifier(nn.Module):
         self.base_model = base_model
         self.num_classes = num_classes
         self.hidden_size = base_model.config.hidden_size
-        self.tokenizer = tokenizer
 
-        # Initialize a classifier head for each class
+        # One classifier head to be applied to each special CLS token embedding
         self.classifier = nn.Sequential(
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.Tanh(),
             nn.Linear(self.hidden_size, 1),
         )
 
-        # Get the token IDs of the special CLS tokens
-        self.special_token_ids = [
-            tokenizer.convert_tokens_to_ids(f"[CLS_{i}]") for i in range(1, num_classes + 1)
-        ]
-
     def forward(self, input_ids, attention_mask):
         outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
-        last_hidden_state = outputs.last_hidden_state  # [batch_size, seq_len, hidden_size]
-
-        # Extract embeddings of the special CLS tokens
-        batch_size = input_ids.size(0)
-        cls_embeddings = []
-
-        for token_id in self.special_token_ids:
-            # Find the positions of the special CLS token in the input_ids
-            positions = (input_ids == token_id).nonzero(as_tuple=True)
-            embeddings = last_hidden_state[positions]
-            # If embeddings are empty (token not found), use zeros
-            if embeddings.size(0) == 0:
-                embeddings = torch.zeros(
-                    (batch_size, self.hidden_size), device=last_hidden_state.device
-                )
-            cls_embeddings.append(embeddings)
-
-        # Stack embeddings to [batch_size, num_classes, hidden_size]
-        cls_embeddings = torch.stack(cls_embeddings, dim=1)
-
-        # Apply classifier head to each class embedding
+        last_hidden_state = outputs.last_hidden_state
+        # Positions: <s> at index 0, then [CLS_1] at 1, [CLS_2] at 2, ..., [CLS_num_classes] at num_classes.
+        # So we can directly slice these embeddings:
+        cls_embeddings = last_hidden_state[:, 1 : 1 + self.num_classes, :]
         logits = self.classifier(cls_embeddings).squeeze(-1)  # [batch_size, num_classes]
-
         return logits
 
 
@@ -226,7 +177,7 @@ def train_epoch(model, dataloader, optimizer, device):
         optimizer.step()
 
         losses.append(loss.item())
-        preds = torch.sigmoid(outputs).cpu().detach().numpy() > 0.5
+        preds = (torch.sigmoid(outputs).cpu().detach().numpy() > 0.5).astype(int)
         all_preds.extend(preds)
         all_labels.extend(labels.cpu().numpy())
 
@@ -262,7 +213,7 @@ def evaluate(model, dataloader, device):
             loss = nn.BCEWithLogitsLoss()(outputs, labels)
             losses.append(loss.item())
 
-            preds = torch.sigmoid(outputs).cpu().detach().numpy() > 0.5
+            preds = (torch.sigmoid(outputs).cpu().detach().numpy() > 0.5).astype(int)
             all_preds.extend(preds)
             all_labels.extend(labels.cpu().numpy())
 
@@ -311,8 +262,8 @@ def main(params_path: str) -> None:
     model = SpecialCLSClassifier(base_model, num_classes, tokenizer)
     optimizer = AdamW(model.parameters(), lr=params.experiment.learning_rate)
 
-    train_dataset = CustomDataset(train_texts, train_labels, tokenizer, num_classes)
-    val_dataset = CustomDataset(val_texts, val_labels, tokenizer, num_classes)
+    train_dataset = CustomDataset(train_texts, train_labels, tokenizer, num_classes, max_length=params.experiment.max_seq_length)
+    val_dataset = CustomDataset(val_texts, val_labels, tokenizer, num_classes, max_length=params.experiment.max_seq_length)
 
     train_dataloader = DataLoader(
         train_dataset, batch_size=params.experiment.batch_size, shuffle=True
