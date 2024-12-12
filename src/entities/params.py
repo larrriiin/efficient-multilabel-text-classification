@@ -18,6 +18,7 @@ class Paths:
     clsx_model_dir: str
     reports_dir: str
     figures_dir: str
+    metrics_dir: str
 
 
 # Определяем параметры для данных
@@ -27,6 +28,8 @@ class DataParams:
     test_file: str
     val_file: str
     sample_submission_file: str
+    cls_metrics_file: str
+    cls_x_metrics_file: str
     test_labels_file: str
     train_split: float
     random_state: int

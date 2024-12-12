@@ -10,6 +10,7 @@ paths:
   clsx_model_dir: "models/CLSX"
   reports_dir: "reports"
   figures_dir: "reports/figures"
+  metrics_dir: "reports/metrics"
 
 data:
   train_file: "train.csv"
@@ -17,6 +18,8 @@ data:
   val_file: "val.csv"
   sample_submission_file: "sample_submission.csv"
   test_labels_file: "test_labels.csv"
+  cls_metrics_file: "metrics_history_cls.csv"
+  cls_x_metrics_file: "metrics_history_cls_x.csv"
   train_split: 0.8
   random_state: 42
 

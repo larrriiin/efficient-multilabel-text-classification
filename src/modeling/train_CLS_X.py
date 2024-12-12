@@ -303,8 +303,8 @@ def main(params_path: str) -> None:
     metrics_df.set_index("epoch", inplace=True)
 
     # Save metrics table to CSV
-    metrics_df.to_csv("metrics_history.csv")
-    logger.info("Metrics history saved to metrics_history.csv")
+    metrics_df.to_csv(Path(params.paths.metrics_dir) / params.data.cls_x_metrics_file)
+    logger.info(f"Metrics history saved to {Path(params.paths.metrics_dir) / params.data.cls_x_metrics_file}")
 
     model_dir = Path(params.paths.clsx_model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
