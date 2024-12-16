@@ -38,7 +38,7 @@ def preprocess_text(text: str, remove_digits=True) -> str:
     text = " ".join(words)
     return text
 ```
-After preprocessing, the data is split into training and validation sets and savet as CSV files:
+After preprocessing, the data is split into training and validation sets and saved as CSV files:
 ```
 train_data, val_data = train_test_split(df,
     test_size=1 - params.data.train_split,
