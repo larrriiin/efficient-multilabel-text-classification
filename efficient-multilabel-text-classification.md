@@ -16,6 +16,7 @@ A project exploring efficient transformer-based architectures for multilabel tex
 The [![ Makefile]()](https://github.com/larrriiin/efficient-multilabel-text-classification/blob/main/Makefile) contains the central entry points for common tasks related to this project.
 
 ## Data preprocessing
+The preprocessing step involves cleaning the text data and preparing it for training.
 ```
 
 def preprocess_text(text: str, remove_digits=True) -> str:
@@ -37,6 +38,7 @@ def preprocess_text(text: str, remove_digits=True) -> str:
     text = " ".join(words)
     return text
 ```
+After preprocessing, the data is split into training and validation sets and savet as CSV files:
 ```
 train_data, val_data = train_test_split(df,
     test_size=1 - params.data.train_split,
@@ -96,7 +98,7 @@ This script performs the following tasks:
 
 
 
-## Разбор полетов 
+## Results Analysys
 Для сравнения моделей, необходимо рассмотреть метрики, наиболее важные для вашей задачи мультиклассификации. Обычно это `val_f1_micro` и `val_f1_macro`, так как они дают понимание качества предсказаний на валидационных данных:
 
 1. `val_f1_micro` — учитывает точность и полноту всех классов, делая акцент на сбалансированности.
@@ -134,7 +136,9 @@ This script performs the following tasks:
 
 ### Итог:
 Первая модель справилась лучше, так как достигла лучших значений F1-метрик (особенно Macro), что критически важно для мультиклассификации.
-
+### Recommendations 
+Choose the first model for deployment due to its superior perfomance in F1 metrics.
+Consider fine-tuning the model with additional data or exploring other transformet architectures for better results.
 
 
 
