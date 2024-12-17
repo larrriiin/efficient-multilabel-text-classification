@@ -1,10 +1,27 @@
 # efficient-multilabel-text-classification
 ### _Alexey Larin, Yuriy Vinnik, Ivan Lisitsyn, Max Goloviznin_
 
-[![late 2024]()](https://github.com/larrriiin/efficient-multilabel-text-classification)
+[late 2024](https://github.com/larrriiin/efficient-multilabel-text-classification)
 
-## Decription
+## Description
 A project exploring efficient transformer-based architectures for multilabel text classification using the Jigsaw Toxic Comment Classification dataset. 
+
+## Problem definition
+Talking about topics you care about online can be really tough. The risk of abuse and harassment often discourages people from sharing their opinions, making them hesitant to engage 
+in discussions with differing viewpoints. As a result, many online platforms find it challenging to enable healthy conversations, leading some communities to restrict or even shut 
+down user comments altogether. This not only stifles dialogue but also limits community engagement.
+
+To tackle these issues, the Conversation AI team—an initiative created by Jigsaw and Google—is working on tools designed to enhance online conversations. One of their key focuses 
+is understanding negative online behaviors, particularly toxic comments. Toxicity can include rude, disrespectful, and overall harmful remarks, which can push users away from 
+discussions. Although they have developed several publicly available models through the Perspective API to assess toxicity, there are still gaps. These models can make mistakes 
+and don’t allow users to specify which types of toxic comments they want to monitor—like distinguishing between profanity and other harmful content.
+
+In this project, we’re excited to take up the challenge of building a multi-headed model that detects various kinds of toxicity, such as threats, obscenity, insults, and 
+identity-based hate. Our approach uses a dataset of comments from Wikipedia’s talk page edits, which provides a rich source of user interactions.
+
+For our project, we've implemented several efficient transformer-based architectures for multilabel text classification. These advanced models can analyze comments in a holistic 
+manner, allowing us to identify multiple types of toxicity all at once. We believe that by improving the accuracy and detail in identifying toxic comments, we can equip platforms 
+with better tools to encourage more respectful interactions among users.
 
 ## Includes 
 - data preprocessing, 
@@ -13,7 +30,7 @@ A project exploring efficient transformer-based architectures for multilabel tex
 - detailed results analysis. 
 
 ## Commands
-The [![ Makefile]()](https://github.com/larrriiin/efficient-multilabel-text-classification/blob/main/Makefile) contains the central entry points for common tasks related to this project.
+The [Makefile](https://github.com/larrriiin/efficient-multilabel-text-classification/blob/main/Makefile) contains the central entry points for common tasks related to this project.
 
 ## Data preprocessing
 The preprocessing step involves cleaning the text data and preparing it for training.
@@ -54,7 +71,7 @@ INFO     | __main__:<module>:1 - Processed train and validation datasets saved i
 ```
 
 ## Model implementation
-[![train_CLS.py]()](https://github.com/larrriiin/efficient-multilabel-text-classification/blob/main/src/modeling/train_CLS.py)
+[train_CLS.py](https://github.com/larrriiin/efficient-multilabel-text-classification/blob/main/src/modeling/train_CLS.py)
 A script for training and evaluating a multilabel text 
 classification model using PyTorch and Transformers (using single CLS embedding)
 with extended metrics (precision, recall, F1 - micro and macro).
@@ -83,7 +100,7 @@ Usage:
     ```
 
 
-[![train_CLS_X.py]()](https://github.com/larrriiin/efficient-multilabel-text-classification/blob/main/src/modeling/train_CLS_X.py)
+[train_CLS_X.py](https://github.com/larrriiin/efficient-multilabel-text-classification/blob/main/src/modeling/train_CLS_X.py)
 A script for training and evaluating a multilabel textclassification model using PyTorch and Transformers with special CLS tokens and additional metrics.
 
 This script performs the following tasks:
