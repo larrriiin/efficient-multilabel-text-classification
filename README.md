@@ -1,5 +1,5 @@
 # efficient-multilabel-text-classification
-### _Alexey Larin, Yuriy Vinnik, Ivan Lisitsyn, Max Goloviznin_
+### _Алексей Ларин, Юрий Винник, Иван Лисицин, Максим Головизнин_
 
 ## Структура проекта (ccds)
 ```
