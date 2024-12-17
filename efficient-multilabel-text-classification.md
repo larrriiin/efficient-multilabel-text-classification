@@ -154,10 +154,50 @@ This script performs the following tasks:
 ### Итог:
 Первая модель справилась лучше, так как достигла лучших значений F1-метрик (особенно Macro), что критически важно для мультиклассификации.
 ### Recommendations 
-Choose the first model for deployment due to its superior perfomance in F1 metrics.
-Consider fine-tuning the model with additional data or exploring other transformet architectures for better results.
+Choose the first model for deployment due to its superior performance in F1 metrics.
+Consider fine-tuning the model with additional data or exploring other transformer architectures for better results.
 
+## Other approaches
+In addition to the proposed approaches (utilizing the `CLS` embedding and adding new `CLS_X` tokens), several other "augmented" 
+architectures for multilabel classification can be considered. Here are a few:
 
+### 1. Mean/Weighted Mean of All Tokens
+   - Rather than relying solely on `CLS` or newly added tokens, one might employ the embeddings of all tokens from the transformer’s output layer.
+   - Subsequently, the mean or weighted mean (for instance, utilizing trainable weights for each token) can be computed.
 
+### 2. Self-Attention for Tokens
+   - An additional self-attention layer can be applied to the embeddings of all tokens.
+   - This enables the model to focus on the most significant tokens for classification.
 
+### 3. Mixing Several Embeddings (CLS, Initial Tokens, Final Tokens)
+   - Instead of employing a solitary `CLS`, one could utilize multiple embeddings:
+     - `CLS`
+     - The first token (pertinent for titles or keywords).
+     - The last token (which may encapsulate the text's final summary).
+   - These can then be fused (for example, through concatenation or summation).
 
+### 4. CNN on Top of Token Embeddings
+   - Applying Convolutional Neural Networks (`CNN`) atop the token sequence.
+   - This method highlights local dependencies among tokens.
+
+### 5. Recurrent Networks (`LSTM/GRU`) on Top of Embeddings
+   - Adding a layer of `LSTM` or `GRU` on the embeddings to account for sequential information.
+
+### 6. Multi-Head Classifiers
+   - Rather than a single classifier, develop distinct classifiers for each class.
+   - This allows for accommodating the specifics of each class.
+
+### 7. Feature Augmentation
+   - Mixing embeddings from various layers of the transformer (for instance, through trainable weights).
+   - This approach enables the utilization of information from both the initial and final layers.
+
+### 8. Graph-Based Pooling
+   - Employing graph-based methods (such as Graph Attention Networks, `GAT`) on the token embeddings.
+   - Each token is treated as a node in the graph, with connections between tokens defined based on attention.
+
+### How to Choose an Approach?
+- When data is scarce: Utilize architectures with fewer parameters, such as `CLS` or token averages.
+- When data is abundant: Explore complex architectures like self-attention or multi-head classifiers.
+- For lengthy texts: Approaches that consider information from all tokens (such as LSTM or CNN) are recommended.
+
+This is the exact reason for opting for CLS_X: given the limited size of our dataset, we find that utilizing complex architectures is not an effective approach.
