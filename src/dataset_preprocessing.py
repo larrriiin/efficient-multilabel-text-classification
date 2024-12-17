@@ -12,7 +12,7 @@ import re
 from loguru import logger
 
 log_dir = Path("logs")
-log_dir.mkdir(parents=True, exist_ok=True)  # Создаем папку, если её нет
+log_dir.mkdir(parents=True, exist_ok=True)
 
 log_file = log_dir / "data_preparation.log"
 logger.add(log_file, rotation="10 MB", retention="10 days", level="INFO")
@@ -28,7 +28,6 @@ nltk.download('stopwords')
 nltk.download('wordnet')
 nltk.download('omw-1.4')
 
-# Инициализация стоп-слов и лемматайзера
 stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 
@@ -38,17 +37,11 @@ def preprocess_text(text: str, remove_digits=True) -> str:
         text = re.sub(r"[^a-zA-Z\s]", "", text)
     else:
         text = re.sub(r"[^a-zA-Z0-9\s]", "", text)
-    # Удаление символов, кроме букв, цифр и пробелов
     text = re.sub(r"[^a-zA-Z0-9\s]", "", text)
-    # Приведение к нижнему регистру
     text = text.lower()
-    # Удаление лишних пробелов
     text = re.sub(r"\s+", " ", text).strip()
-    # Разделение текста на слова
     words = text.split()
-    # Удаление стоп-слов и лемматизация
     words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words]
-    # Сборка обратно в строку
     text = " ".join(words)
     return text
 
