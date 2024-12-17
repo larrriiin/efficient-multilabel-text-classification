@@ -123,6 +123,7 @@ This script performs the following tasks:
 
 ### Анализ метрик
 Из таблиц видно, что:
+
 | epoch | train_loss           | val_loss             | train_precision_micro | train_recall_micro | train_f1_micro     | train_precision_macro | train_recall_macro | train_f1_macro     | val_precision_micro | val_recall_micro   | val_f1_micro       | val_precision_macro | val_recall_macro    | val_f1_macro        |
 |-------|----------------------|----------------------|-----------------------|--------------------|--------------------|-----------------------|--------------------|--------------------|---------------------|--------------------|--------------------|---------------------|---------------------|---------------------|
 | 1     | 0.06206429489200354  | 0.04530734757870613  | 0.7813236541906289    | 0.5914573222951756 | 0.6732604898655511 | 0.5176717905108884    | 0.3494757554525923 | 0.3930207091100073 | 0.8002233923727461  | 0.7089341249646594 | 0.7518177048197288 | 0.5011965185691741  | 0.41060172648290844 | 0.42506755788470657 |
@@ -222,5 +223,3 @@ This is the exact reason for opting for CLS_X: given the limited size of our dat
     https://yashuseth.blog/2019/06/12/bert-explained-faqs-understand-bert-working/
     https://gist.github.com/MrEliptik/b3f16179aa2f530781ef8ca9a16499af
     https://machinelearningmastery.com/gentle-introduction-bag-words-model/
-
-
