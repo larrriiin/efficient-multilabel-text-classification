@@ -287,7 +287,6 @@ def main(params_path: str) -> None:
         }
         metrics_history.append(epoch_metrics)
 
-    # Convert metrics history to DataFrame and save
     metrics_df = pd.DataFrame(metrics_history)
     metrics_df.set_index("epoch", inplace=True)
     metrics_df.to_csv(Path(params.paths.metrics_dir) / params.data.cls_metrics_file)
@@ -296,10 +295,8 @@ def main(params_path: str) -> None:
     model_dir = Path(params.paths.cls_model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    # Сохранение токенайзера
     tokenizer.save_pretrained(model_dir)
 
-    # Сохранение модели
     model.base_model.save_pretrained(model_dir)
 
     torch.save(model.classifier.state_dict(), model_dir / "classifier_head.pth")
