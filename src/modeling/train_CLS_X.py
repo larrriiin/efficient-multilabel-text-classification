@@ -250,9 +250,8 @@ def main(params_path: str) -> None:
 
     tokenizer = AutoTokenizer.from_pretrained(params.model.pretrained_model_name)
 
-    num_classes = train_labels.shape[1]  # Number of labels
+    num_classes = train_labels.shape[1]
 
-    # Add special CLS tokens to the tokenizer
     special_tokens = [f"[CLS_{i}]" for i in range(1, num_classes + 1)]
     tokenizer.add_tokens(special_tokens)
 
@@ -275,7 +274,6 @@ def main(params_path: str) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    # Initialize metrics storage
     metrics_history = []
 
     for epoch in range(params.experiment.num_epochs):
@@ -288,7 +286,6 @@ def main(params_path: str) -> None:
         logger.info(f"Val Loss: {val_loss:.4f}")
         logger.info(f"Val Metrics: {val_metrics}")
 
-        # Store metrics
         epoch_metrics = {
             "epoch": epoch + 1,
             "train_loss": train_loss,
@@ -298,24 +295,19 @@ def main(params_path: str) -> None:
         }
         metrics_history.append(epoch_metrics)
 
-    # Convert metrics history to DataFrame
     metrics_df = pd.DataFrame(metrics_history)
     metrics_df.set_index("epoch", inplace=True)
 
-    # Save metrics table to CSV
     metrics_df.to_csv(Path(params.paths.metrics_dir) / params.data.cls_x_metrics_file)
     logger.info(f"Metrics history saved to {Path(params.paths.metrics_dir) / params.data.cls_x_metrics_file}")
 
     model_dir = Path(params.paths.clsx_model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save tokenizer
     tokenizer.save_pretrained(model_dir)
 
-    # Save model
     model.base_model.save_pretrained(model_dir)
 
-    # Save classifier state dict
     torch.save(model.classifier.state_dict(), model_dir / "classifier_head.pth")
 
     logger.success(f"Model and tokenizer saved to: {model_dir}")
