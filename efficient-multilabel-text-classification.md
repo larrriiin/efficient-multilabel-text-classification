@@ -201,3 +201,26 @@ architectures for multilabel classification can be considered. Here are a few:
 - For lengthy texts: Approaches that consider information from all tokens (such as LSTM or CNN) are recommended.
 
 This is the exact reason for opting for CLS_X: given the limited size of our dataset, we find that utilizing complex architectures is not an effective approach.
+
+## References
+
+### Paper:
+
+    Text Classification Algorithms: A Survey
+
+### Books:
+
+    Natural Language Processing in Action
+    Speech and Language Processing
+
+### Blogs/Articles/Notebooks:
+    
+    https://www.kaggle.com/abhinand05/bert-for-humans-tutorial-baseline-version-2
+    https://www.kaggle.com/amar09/text-pre-processing-and-feature-extraction
+    https://www.kaggle.com/datafan07/disaster-tweets-nlp-eda-bert-with-transformers
+    https://www.kaggle.com/gunesevitan/nlp-with-disaster-tweets-eda-cleaning-and-bert
+    https://yashuseth.blog/2019/06/12/bert-explained-faqs-understand-bert-working/
+    https://gist.github.com/MrEliptik/b3f16179aa2f530781ef8ca9a16499af
+    https://machinelearningmastery.com/gentle-introduction-bag-words-model/
+
+
