@@ -4,7 +4,6 @@ from marshmallow_dataclass import class_schema
 from pathlib import Path
 
 
-# Определяем параметры для путей
 @dataclass
 class Paths:
     project_root: str
@@ -21,7 +20,6 @@ class Paths:
     metrics_dir: str
 
 
-# Определяем параметры для данных
 @dataclass
 class DataParams:
     train_file: str
@@ -35,7 +33,6 @@ class DataParams:
     random_state: int
 
 
-# Определяем параметры для экспериментов
 @dataclass
 class ExperimentParams:
     batch_size: int
@@ -45,13 +42,11 @@ class ExperimentParams:
     seed: int
 
 
-# Определяем параметры для модели
 @dataclass
 class ModelParams:
     pretrained_model_name: str
 
 
-# Основной класс для всех параметров пайплайна
 @dataclass
 class PipelineParams:
     paths: Paths
@@ -60,7 +55,6 @@ class PipelineParams:
     model: ModelParams
 
 
-# Создаем схему для валидации и загрузки параметров
 PipelineParamsSchema = class_schema(PipelineParams)
 
 
