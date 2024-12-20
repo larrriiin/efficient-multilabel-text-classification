@@ -15,4 +15,5 @@ nltk
 pyyaml
 marshmallow
 marshmallow-dataclass
+tensorboard
 -e .
