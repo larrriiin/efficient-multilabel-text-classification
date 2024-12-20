@@ -29,24 +29,22 @@ Usage:
 
 import sys
 from pathlib import Path
-from transformers import AutoModel, AutoTokenizer, AdamW
+from transformers import AutoModel, AutoTokenizer, AdamW, get_linear_schedule_with_warmup
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
-from sklearn.metrics import (
-    f1_score,
-    precision_score,
-    recall_score
-)
 import numpy as np
 from tqdm import tqdm
 import pandas as pd
 import typer
 from loguru import logger
+from torch.utils.tensorboard import SummaryWriter
+import torchmetrics
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from entities.params import read_pipeline_params
+from entities.utils import set_seed, train_epoch, evaluate
 
 app = typer.Typer()
 
@@ -58,13 +56,7 @@ log_dir.mkdir(parents=True, exist_ok=True)
 log_file = log_dir / "train_cls_extended_metrics.log"
 logger.add(log_file, rotation="10 MB", retention="10 days", level="INFO")
 
-def set_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+writer = SummaryWriter(log_dir="runs")
 
 class CustomDataset(Dataset):
     """
@@ -76,7 +68,6 @@ class CustomDataset(Dataset):
         tokenizer: Tokenizer for text processing.
         max_length (int): Max sequence length (default: 128).
     """
-
     def __init__(self, texts, labels, tokenizer, max_length=128):
         self.texts = texts
         self.labels = labels
@@ -102,7 +93,6 @@ class CustomDataset(Dataset):
             "labels": torch.tensor(label, dtype=torch.float32),
         }
 
-
 class CLSClassifier(nn.Module):
     """
     A classification model with a transformer base and a custom classifier head.
@@ -111,7 +101,6 @@ class CLSClassifier(nn.Module):
         base_model: Pretrained transformer model.
         num_classes (int): Number of output classes.
     """
-
     def __init__(self, base_model, num_classes):
         super(CLSClassifier, self).__init__()
         self.base_model = base_model
@@ -125,104 +114,6 @@ class CLSClassifier(nn.Module):
         outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask)
         cls_output = outputs.last_hidden_state[:, 0, :]  # [CLS] token
         return self.classifier(cls_output)
-
-
-def compute_metrics(labels, preds):
-    """
-    Computes precision, recall, and F1 scores (micro and macro averages).
-
-    Args:
-        labels: True labels.
-        preds: Predicted labels.
-
-    Returns:
-        dict: Dictionary containing all computed metrics.
-    """
-    metrics = {
-        "precision_micro": precision_score(labels, preds, average="micro", zero_division=0),
-        "recall_micro": recall_score(labels, preds, average="micro", zero_division=0),
-        "f1_micro": f1_score(labels, preds, average="micro", zero_division=0),
-        "precision_macro": precision_score(labels, preds, average="macro", zero_division=0),
-        "recall_macro": recall_score(labels, preds, average="macro", zero_division=0),
-        "f1_macro": f1_score(labels, preds, average="macro", zero_division=0),
-    }
-    return metrics
-
-
-def train_epoch(model, dataloader, optimizer, device):
-    """
-    Trains the model for one epoch.
-
-    Args:
-        model: The model to train.
-        dataloader: DataLoader for training data.
-        optimizer: Optimizer for updating model weights.
-        device: Device for computation (CPU/GPU).
-
-    Returns:
-        tuple: Average loss and metrics for the epoch.
-    """
-    model.train()
-    losses = []
-    all_preds = []
-    all_labels = []
-
-    for batch in tqdm(dataloader, desc="Training"):
-        optimizer.zero_grad()
-        input_ids = batch["input_ids"].to(device)
-        attention_mask = batch["attention_mask"].to(device)
-        labels = batch["labels"].to(device)
-
-        outputs = model(input_ids, attention_mask)
-        loss = nn.BCEWithLogitsLoss()(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-        losses.append(loss.item())
-        preds = (torch.sigmoid(outputs).cpu().detach().numpy() > 0.5).astype(int)
-        all_preds.extend(preds)
-        all_labels.extend(labels.cpu().numpy())
-
-    avg_loss = np.mean(losses)
-    metrics = compute_metrics(np.array(all_labels), np.array(all_preds))
-    return avg_loss, metrics
-
-
-def evaluate(model, dataloader, device):
-    """
-    Evaluates the model on a validation dataset.
-
-    Args:
-        model: The model to evaluate.
-        dataloader: DataLoader for validation data.
-        device: Device for computation (CPU/GPU).
-
-    Returns:
-        tuple: Average loss and metrics for the validation dataset.
-    """
-    model.eval()
-    all_preds = []
-    all_labels = []
-    losses = []
-
-    with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Validation"):
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
-            labels = batch["labels"].to(device)
-
-            outputs = model(input_ids, attention_mask)
-            loss = nn.BCEWithLogitsLoss()(outputs, labels)
-            losses.append(loss.item())
-
-            preds = (torch.sigmoid(outputs).cpu().detach().numpy() > 0.5).astype(int)
-            all_preds.extend(preds)
-            all_labels.extend(labels.cpu().numpy())
-
-    avg_loss = np.mean(losses)
-    metrics = compute_metrics(np.array(all_labels), np.array(all_preds))
-    return avg_loss, metrics
-
 
 @app.command()
 def main(params_path: str) -> None:
@@ -257,6 +148,13 @@ def main(params_path: str) -> None:
     model = CLSClassifier(base_model, num_classes)
     optimizer = AdamW(model.parameters(), lr=params.experiment.learning_rate)
 
+    total_steps = len(train_texts) // params.experiment.batch_size * params.experiment.num_epochs
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=int(0.1 * total_steps),
+        num_training_steps=total_steps
+    )
+
     train_dataset = CustomDataset(train_texts, train_labels, tokenizer, max_length=params.experiment.max_seq_length)
     val_dataset = CustomDataset(val_texts, val_labels, tokenizer, max_length=params.experiment.max_seq_length)
 
@@ -266,17 +164,24 @@ def main(params_path: str) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
+    loss_metric = torchmetrics.MeanMetric().to(device)
     metrics_history = []
 
     for epoch in range(params.experiment.num_epochs):
         logger.info(f"Epoch {epoch + 1}/{params.experiment.num_epochs}")
-        train_loss, train_metrics = train_epoch(model, train_dataloader, optimizer, device)
+        train_loss, train_metrics = train_epoch(model, train_dataloader, optimizer, scheduler, device, loss_metric, writer=writer)
         val_loss, val_metrics = evaluate(model, val_dataloader, device)
 
         logger.info(f"Train Loss: {train_loss:.4f}")
         logger.info(f"Train Metrics: {train_metrics}")
         logger.info(f"Val Loss: {val_loss:.4f}")
         logger.info(f"Val Metrics: {val_metrics}")
+
+        writer.add_scalar("Loss/Validation", val_loss, epoch)
+        for metric, value in train_metrics.items():
+            writer.add_scalar(f"Metrics/Train/{metric}", value, epoch)
+        for metric, value in val_metrics.items():
+            writer.add_scalar(f"Metrics/Validation/{metric}", value, epoch)
 
         epoch_metrics = {
             "epoch": epoch + 1,
