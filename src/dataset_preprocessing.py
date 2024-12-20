@@ -6,10 +6,7 @@ from loguru import logger
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import make_classification
 import nltk
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
 import re
-from loguru import logger
 
 log_dir = Path("logs")
 log_dir.mkdir(parents=True, exist_ok=True)
@@ -24,27 +21,16 @@ from entities.params import read_pipeline_params
 
 app = typer.Typer()
 
-nltk.download('stopwords')
-nltk.download('wordnet')
 nltk.download('omw-1.4')
-
-stop_words = set(stopwords.words('english'))
-lemmatizer = WordNetLemmatizer()
-
 
 def preprocess_text(text: str, remove_digits=True) -> str:
     if remove_digits:
         text = re.sub(r"[^a-zA-Z\s]", "", text)
     else:
         text = re.sub(r"[^a-zA-Z0-9\s]", "", text)
-    text = re.sub(r"[^a-zA-Z0-9\s]", "", text)
     text = text.lower()
     text = re.sub(r"\s+", " ", text).strip()
-    words = text.split()
-    words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words]
-    text = " ".join(words)
     return text
-
 
 @app.command()
 def main(params_path: str):
@@ -70,7 +56,6 @@ def main(params_path: str):
     val_data.to_csv(processed_data_dir / params.data.val_file, index=False)
 
     logger.success(f"Processed train and validation datasets saved in {processed_data_dir}")
-
 
 if __name__ == "__main__":
     app()
