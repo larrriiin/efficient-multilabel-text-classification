@@ -28,10 +28,9 @@
 ├── requirements.txt   <- Файл с зависимостями для воспроизведения окружения анализа
 │
 ├── runs               <- Логи TensorBoard 
-│    │  
-│    ├── cls_standard
-│    │
-│    └── cls_special_tokens
+│   │  
+│   ├── cls_standard
+│   └── cls_special_tokens
 │  
 ├── setup.cfg          <- Конфигурационный файл для flake8  
 │  
@@ -46,8 +45,9 @@
     │   ├── train_CLS.py              <- Код для обучения модели CLS  
     │   └── train_CLS_X.py            <- Код для обучения модели CLS_X  
     └── entities                
-        ├── __init__.py 
-        └── params.py                 <- Код для создания класса параметров  
+        ├── __init__.py
+        ├── params.py                 <- Код для создания класса параметров  
+        └── utils.py                  <- Функции для работы кода
 
 ```
 
